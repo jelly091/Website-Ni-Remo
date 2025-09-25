@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galaxy Calculator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:"Poppins",sans-serif;}
+body{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+  overflow:hidden;
+  background:#000;
+  color:#0ff;
+  position:relative;
+}
+
+/* 🌌 Starfield background */
+canvas#starfield{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100vw;
+  height:100vh;
+  z-index:-2;
+  background:#000;
+}
+
+/* Glowing Circles */
+.circle{
+  position:absolute;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(0,255,255,0.3),transparent 70%);
+  animation:pulse 10s infinite alternate;
+  z-index:-1;
+}
+.circle.big{width:600px;height:600px;top:10%;left:20%;}
+.circle.mid{width:400px;height:400px;bottom:15%;right:15%;}
+@keyframes pulse{
+  from{transform:scale(0.9);opacity:0.6;}
+  to{transform:scale(1.1);opacity:1;}
+}
+
+/* Container */
+.container{
+  position:relative;
+  background:rgba(20,20,40,0.85);
+  padding:20px;
+  border-radius:20px;
+  width:320px;
+  max-width:90vw;
+  text-align:center;
+  box-shadow:0 0 25px rgba(0,255,255,0.8), inset 0 0 12px rgba(0,255,255,0.4);
+  z-index:1;
+  border:1px solid rgba(0,255,255,0.6);
+  animation:glow 3s infinite alternate;
+}
+@keyframes glow{
+  from{box-shadow:0 0 18px #0ff, inset 0 0 6px #0ff;}
+  to{box-shadow:0 0 35px #0ff, inset 0 0 18px #0ff;}
+}
+h2{
+  margin-bottom:12px;
+  color:#0ff;
+  text-shadow:0 0 18px #0ff;
+  animation:neonText 2s infinite alternate;
+}
+@keyframes neonText{
+  from{text-shadow:0 0 10px #0ff;}
+  to{text-shadow:0 0 24px #0ff,0 0 36px #0ff;}
+}
+
+/* Input fields */
+.input-group{position:relative;}
+input{
+  width:100%;
+  padding:10px;
+  margin:6px 0;
+  border:1px solid #0ff;
+  border-radius:10px;
+  background:rgba(0,0,20,0.9);
+  color:#0ff;
+  font-size:14px;
+  outline:none;
+  text-align:center;
+}
+.toggle-btn{
+  position:absolute;
+  top:50%;
+  right:10px;
+  transform:translateY(-50%);
+  cursor:pointer;
+  font-size:12px;
+  color:#0ff;
+}
+
+/* Buttons */
+button{
+  padding:10px;
+  margin-top:8px;
+  width:100%;
+  background:rgba(0,255,255,0.15);
+  color:#0ff;
+  border:1px solid #0ff;
+  border-radius:10px;
+  font-size:14px;
+  cursor:pointer;
+  transition:0.3s;
+  text-shadow:0 0 8px #0ff;
+}
+button:hover{background:rgba(0,255,255,0.4);color:#fff;transform:scale(1.05);}
+
+.link{margin-top:6px;cursor:pointer;color:#0ff;text-decoration:underline;font-size:13px;}
+.calculator-container{display:none;width:340px;max-width:95vw;}
+
+/* Display */
+.keyboard-display{
+  width:100%;
+  height:40px;
+  margin-bottom:6px;
+  font-size:14px;
+  text-align:center;
+  line-height:40px;
+  border-radius:8px;
+  background:rgba(0,0,20,0.7);
+  color:#0ff;
+  border:1px solid #0ff;
+  box-shadow:inset 0 0 8px rgba(0,255,255,0.4);
+}
+.display{
+  width:100%;
+  height:60px;
+  margin-bottom:10px;
+  font-size:20px;
+  text-align:right;
+  padding:8px;
+  border-radius:12px;
+  border:1px solid #0ff;
+  background:rgba(0,0,20,0.9);
+  color:#0ff;
+  box-shadow:inset 0 0 12px rgba(0,255,255,0.5);
+}
+
+/* Calculator Buttons */
+.buttons{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.btn{
+  padding:12px;
+  font-size:14px;
+  border:1px solid #0ff;
+  border-radius:8px;
+  cursor:pointer;
+  background:rgba(0,255,255,0.15);
+  color:#0ff;
+  transition:0.2s;
+  box-shadow:0 0 10px rgba(0,255,255,0.3);
+}
+.btn:hover{background:#0ff;color:#000;transform:translateY(-2px);}
+.equal{grid-column:span 2;background:#0ff;color:#000;font-weight:bold;}
+.logout{margin-top:8px;background:#f00;color:#fff;border:none;box-shadow:0 0 12px red;}
+
+/* Active highlight */
+.btn.active {
+  background: #0ff !important;
+  color: #000 !important;
+  transform: scale(1.1);
+  box-shadow: 0 0 20px #0ff;
+}
+</style>
+</head>
+<body>
+
+<!-- 🌌 Background -->
+<canvas id="starfield"></canvas>
+<div class="circle big"></div>
+<div class="circle mid"></div>
+
+<!-- Login -->
+<div class="container" id="login-container">
+  <h2>🔐 Calculator Login</h2>
+  <div class="input-group">
+    <input type="text" id="username" placeholder="Username" required>
+  </div>
+  <div class="input-group">
+    <input type="password" id="password" placeholder="Password" required>
+    <span class="toggle-btn" onclick="toggleVisibility('password')">👁</span>
+  </div>
+  <button onclick="login()">Login</button>
+  <div class="link" onclick="showRegister()">Create Account</div>
+</div>
+
+<!-- Register -->
+<div class="container" id="register-container" style="display:none;">
+  <h2>📝 Create Account</h2>
+  <input type="text" id="newUsername" placeholder="New Username" required>
+  <input type="password" id="newPassword" placeholder="New Password" required>
+  <button onclick="register()">Register</button>
+  <div class="link" onclick="showLogin()">Back to Login</div>
+</div>
+
+<!-- Calculator -->
+<div class="container calculator-container" id="calculator-container">
+  <h2>🧮 Galaxy Calculator</h2>
+  <div class="keyboard-display" id="keyboardDisplay">⌨ Press keys...</div>
+  <input type="text" class="display" id="display" disabled>
+  <div class="buttons">
+    <button class="btn">C</button>
+    <button class="btn">DEL</button>
+    <button class="btn">%</button>
+    <button class="btn">÷</button>
+    <button class="btn">×</button>
+
+    <button class="btn">7</button>
+    <button class="btn">8</button>
+    <button class="btn">9</button>
+    <button class="btn">−</button>
+    <button class="btn">+</button>
+
+    <button class="btn">4</button>
+    <button class="btn">5</button>
+    <button class="btn">6</button>
+    <button class="btn">xʸ</button>
+    <button class="btn">√</button>
+
+    <button class="btn">1</button>
+    <button class="btn">2</button>
+    <button class="btn">3</button>
+    <button class="btn">sin</button>
+    <button class="btn">cos</button>
+
+    <button class="btn">0</button>
+    <button class="btn">.</button>
+    <button class="btn">tan</button>
+    <button class="btn">log</button>
+    <button class="btn">ln</button>
+
+    <button class="btn">π</button>
+    <button class="btn">e</button>
+    <button class="btn">x²</button>
+    <button class="btn">x³</button>
+    <button class="btn equal">=</button>
+  </div>
+  <button class="logout" onclick="logout()">Logout</button>
+</div>
+
+<script>
+const defaultUser={username:"admin",password:"1234"};
+
+function login(){
+  let username=document.getElementById("username").value.trim().toLowerCase();
+  let password=document.getElementById("password").value.trim().toLowerCase();
+  let storedUsers=JSON.parse(localStorage.getItem("users"))||[];
+  let found=storedUsers.find(u=>u.username===username&&u.password===password);
+  if((username===defaultUser.username&&password===defaultUser.password)||found){
+    document.getElementById("login-container").style.display="none";
+    document.getElementById("register-container").style.display="none";
+    document.getElementById("calculator-container").style.display="block";
+  }else{alert("❌ Invalid!");}
+}
+function logout(){
+  document.getElementById("login-container").style.display="block";
+  document.getElementById("calculator-container").style.display="none";
+  document.getElementById("display").value="";
+}
+function register(){
+  let newU=document.getElementById("newUsername").value.trim().toLowerCase();
+  let newP=document.getElementById("newPassword").value.trim().toLowerCase();
+  if(!newU||!newP){alert("Please fill in all fields");return;}
+  let users=JSON.parse(localStorage.getItem("users"))||[];
+  if(users.find(u=>u.username===newU)){alert("⚠ Username exists");return;}
+  users.push({username:newU,password:newP});
+  localStorage.setItem("users",JSON.stringify(users));
+  alert("✅ Account created! Now login.");
+  showLogin();
+}
+function showRegister(){
+  document.getElementById("login-container").style.display="none";
+  document.getElementById("register-container").style.display="block";
+}
+function showLogin(){
+  document.getElementById("register-container").style.display="none";
+  document.getElementById("login-container").style.display="block";
+}
+
+// Calculator logic
+const display=document.getElementById("display");
+const keyboardDisplay=document.getElementById("keyboardDisplay");
+let pressedKeys=[];
+
+function append(v){display.value+=v;}
+function clearDisplay(){display.value="";}
+function deleteChar(){display.value=display.value.slice(0,-1);}
+function calculate(){try{display.value=eval(display.value);}catch{alert("Invalid Expression");}}
+function toggleVisibility(id){
+  let input=document.getElementById(id);
+  let btn=input.nextElementSibling;
+  if(input.type==="password"){input.type="text";btn.textContent="🙈";}
+  else{input.type="password";btn.textContent="👁";}
+}
+
+document.addEventListener("keydown",e=>{
+  // keep track of last 10 keys
+  pressedKeys.push(e.key);
+  if(pressedKeys.length>10) pressedKeys.shift();
+  keyboardDisplay.textContent="⌨ "+pressedKeys.join(" ");
+
+  // highlight button
+  highlightButton(e.key);
+
+  // calculator input
+  if(!isNaN(e.key)||["+","-","*","/","."].includes(e.key)) append(e.key);
+  if(e.key==="Enter") calculate();
+  if(e.key==="Backspace") deleteChar();
+  if(e.key==="Escape") clearDisplay();
+});
+
+function highlightButton(key){
+  const keyMap={"/":"÷","*":"×","-":"−","+":"+","Enter":"=","Backspace":"DEL","Escape":"C"};
+  let btnText=keyMap[key]||key;
+  const btns=document.querySelectorAll(".btn");
+  btns.forEach(btn=>{
+    if(btn.textContent.trim()===btnText){
+      btn.classList.add("active");
+      setTimeout(()=>btn.classList.remove("active"),150);
+    }
+  });
+}
+
+/* 🌌 Starfield Effect */
+const canvas=document.getElementById("starfield");
+const ctx=canvas.getContext("2d");
+let stars=[];
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+window.addEventListener("resize",resize);
+resize();
+for(let i=0;i<200;i++){stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,z:Math.random()*canvas.width});}
+function animate(){
+  ctx.fillStyle="black";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#0ff";
+  for(let i=0;i<stars.length;i++){
+    stars[i].z-=2;if(stars[i].z<=0)stars[i].z=canvas.width;
+    let k=128.0/stars[i].z;
+    let px=stars[i].x*k+canvas.width/2;
+    let py=stars[i].y*k+canvas.height/2;
+    if(px>=0&&px<canvas.width&&py>=0&&py<canvas.height){
+      let size=(1-stars[i].z/canvas.width)*3;
+      ctx.fillRect(px,py,size,size);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>
