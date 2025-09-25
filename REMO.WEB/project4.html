@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Todo + Schedule + Reminders + 3D Animation + Calendar</title>
+  <!-- Bootstrap CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0f1720; --card:#111826; --muted:#9aa4b2; --accent:#6ee7b7; --btn:#2563eb;
+    }
+    html,body{height:100%;}
+    body{
+      background:linear-gradient(180deg,#071022 0%, #0b1320 100%);
+      color:#e6eef6; font-family:Inter, system-ui, sans-serif;
+    }
+    .app-shell{min-height:100vh;display:flex}
+    .sidebar{width:88px;background:rgba(255,255,255,0.03);border-right:1px solid rgba(255,255,255,0.03);display:flex;flex-direction:column;align-items:center;padding-top:18px}
+    .sidebar .btn{color:var(--muted);} .sidebar .btn.active{color:var(--accent);}
+    .main{flex:1;display:flex;flex-direction:column}
+    .topbar{height:64px;display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,0.03)}
+    .workspace{display:flex;gap:18px;padding:18px}
+    .panel{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(2,6,23,0.6);}
+    .tasks-panel{flex:1;min-width:360px}
+    .three-panel{width:520px;display:flex;flex-direction:column;gap:12px}
+    .task{display:flex;align-items:center;gap:12px;padding:10px;border-radius:8px}
+    .task.completed .title{text-decoration:line-through;color:rgba(255,255,255,0.5)}
+    .small-muted{color:var(--muted);font-size:12px}
+    .due-soon{color:#ffb020}
+    .btn-record{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    input[type=datetime-local]{background:transparent;color:inherit;border:none;border-bottom:1px dashed rgba(255,255,255,0.04);padding:6px}
+    .hint{font-size:12px;color:var(--muted)}
+    /* Calendar styling */
+    #calendar {
+      background: rgba(255,255,255,0.02);
+      border-radius: 12px;
+      padding: 10px;
+      color: #e6eef6;
+    }
+    .fc {
+      background: transparent !important;
+    }
+    .fc-toolbar-title, .fc-col-header-cell-cushion, .fc-daygrid-day-number {
+      color: #e6eef6 !important;
+    }
+    .fc-day-today {
+      background: rgba(110, 231, 183, 0.15) !important;
+    }
+    /* responsive */
+    @media(max-width:900px){.three-panel{display:none}.workspace{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="sidebar">
+      <button class="btn mb-3" title="Home"><i class="bi bi-list-task fs-3"></i></button>
+      <button class="btn mb-3 active" title="Todos"><i class="bi bi-journal-check fs-3"></i></button>
+      <button class="btn mb-3" title="Schedule"><i class="bi bi-calendar-event fs-3"></i></button>
+      <button class="btn" title="Settings"><i class="bi bi-gear fs-3"></i></button>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <h5 class="mb-0"> Todo List• Schedule • Reminders</h5>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <span class="small-muted">Dark mode</span>
+          <div class="form-check form-switch ms-2">
+            <input class="form-check-input" type="checkbox" id="toggleSound" checked>
+            <label class="form-check-label small-muted" for="toggleSound">Sound</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <!-- Tasks panel -->
+        <div class="panel tasks-panel">
+          <div class="d-flex align-items-start justify-content-between mb-3">
+            <div>
+              <h6 class="mb-1">Create Task</h6>
+              <div class="hint">Add title, pick due date/time, and enable reminder</div>
+            </div>
+            <div>
+              <button id="exportBtn" class="btn btn-sm btn-outline-light">Export JSON</button>
+            </div>
+          </div>
+
+          <form id="taskForm" class="mb-3">
+            <div class="mb-2">
+              <input id="titleInput" class="form-control bg-transparent text-white" placeholder="Task title (e.g., Submit report)" required>
+            </div>
+            <div class="d-flex gap-2 mb-2">
+              <input id="dueInput" type="datetime-local" class="form-control" style="max-width:260px">
+              <div class="form-check d-flex align-items-center">
+                <input class="form-check-input" type="checkbox" id="reminderChk">
+                <label class="form-check-label small-muted ms-2" for="reminderChk">Set reminder</label>
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary" type="submit">Add Task</button>
+              <button id="clearBtn" type="button" class="btn btn-outline-light">Clear</button>
+            </div>
+          </form>
+
+          <hr style="border-color:rgba(255,255,255,0.03)">
+
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0">Tasks</h6>
+            <div class="small-muted">Showing <span id="count">0</span></div>
+          </div>
+
+          <div id="taskList" class="d-flex flex-column gap-2" style="max-height:56vh;overflow:auto;padding-right:6px"></div>
+        </div>
+
+        <!-- 3D + calendar panel -->
+        <div class="three-panel panel">
+          <div class="d-flex align-items-center justify-content-between">
+            <h6 class="mb-0">Ritual</h6>
+            <div class="d-flex gap-2">
+              <button id="toggleAnim" class="btn btn-sm btn-record">Pause</button>
+              <button id="recordBtn" class="btn btn-sm btn-record">Record 4s</button>
+            </div>
+          </div>
+          <div id="threeWrap" style="height:280px;border-radius:10px;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));display:flex;align-items:center;justify-content:center">
+            <canvas id="threeCanvas"></canvas>
+          </div>
+          <div class="small-muted">Click the cube to toggle the last incomplete task.</div>
+
+          <!-- Transparent calendar -->
+          <div id="calendar" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>
+/* ======= Todo + Schedule + Reminder + Enhanced 3D Animation + Calendar ======= */
+
+// Utilities
+const $ = (sel) => document.querySelector(sel);
+let tasks = JSON.parse(localStorage.getItem('todo_tasks_v1')||'[]');
+let timers = [];
+
+// Elements
+const taskForm = $('#taskForm');
+const titleInput = $('#titleInput');
+const dueInput = $('#dueInput');
+const reminderChk = $('#reminderChk');
+const taskList = $('#taskList');
+const countSpan = $('#count');
+const clearBtn = $('#clearBtn');
+const exportBtn = $('#exportBtn');
+const toggleSound = $('#toggleSound');
+const ding = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YRAAAA==');
+
+if('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+function save(){ localStorage.setItem('todo_tasks_v1', JSON.stringify(tasks)); }
+
+function addTask(title, due=null, remind=false){
+  const id = Date.now() + Math.random().toString(36).slice(2,8);
+  const t = {id, title, due: due?new Date(due).toISOString():null, remind:!!remind, done:false, created: new Date().toISOString() };
+  tasks.unshift(t);
+  scheduleReminders();
+  save(); render();
+}
+
+function toggleDone(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return; t.done = !t.done; save(); render();
+}
+function removeTask(id){ tasks = tasks.filter(x=>x.id!==id); save(); render(); }
+function editTask(id, newTitle){ const t = tasks.find(x=>x.id===id); if(t){ t.title=newTitle; save(); render(); }}
+
+function render(){
+  taskList.innerHTML='';
+  tasks.forEach(t=>{
+    const wrap = document.createElement('div'); wrap.className = 'task panel d-flex align-items-center justify-content-between';
+    if(t.done) wrap.classList.add('completed');
+    const left = document.createElement('div'); left.style.flex='1';
+    const title = document.createElement('div'); title.className='title'; title.textContent = t.title;
+    const meta = document.createElement('div'); meta.className='small-muted';
+    let metaText = new Date(t.created).toLocaleString();
+    if(t.due){
+      const dueDate = new Date(t.due);
+      const now = new Date();
+      if(!t.done){
+        if(dueDate - now < 1000*60*60*24 && dueDate - now > 0) metaText += ' • due soon';
+        if(dueDate < now) metaText = '⚠️ Overdue • ' + dueDate.toLocaleString();
+      } else { metaText += ' • completed'; }
+      metaText += ' • ' + dueDate.toLocaleString();
+    }
+    meta.textContent = metaText;
+    left.appendChild(title); left.appendChild(meta);
+
+    const actions = document.createElement('div'); actions.className = 'd-flex gap-2 align-items-center';
+    const doneBtn = document.createElement('button'); doneBtn.className='btn btn-sm btn-outline-success'; doneBtn.innerHTML = t.done?'<i class="bi bi-arrow-counterclockwise"></i>':'<i class="bi bi-check2"></i>';
+    doneBtn.onclick = ()=> toggleDone(t.id);
+    const editBtn = document.createElement('button'); editBtn.className='btn btn-sm btn-outline-light'; editBtn.innerHTML='<i class="bi bi-pencil"></i>';
+    editBtn.onclick = ()=>{ const newTitle = prompt('Edit task title', t.title); if(newTitle) editTask(t.id, newTitle.trim()); };
+    const delBtn = document.createElement('button'); delBtn.className='btn btn-sm btn-outline-danger'; delBtn.innerHTML='<i class="bi bi-trash"></i>';
+    delBtn.onclick = ()=>{ if(confirm('Delete task?')) removeTask(t.id); };
+    actions.appendChild(doneBtn); actions.appendChild(editBtn); actions.appendChild(delBtn);
+
+    wrap.appendChild(left); wrap.appendChild(actions);
+    taskList.appendChild(wrap);
+  });
+  countSpan.textContent = tasks.length;
+  if(window.refreshCalendar) window.refreshCalendar();
+}
+
+taskForm.addEventListener('submit', (e)=>{ e.preventDefault(); if(!titleInput.value.trim()) return;
+  addTask(titleInput.value.trim(), dueInput.value||null, reminderChk.checked);
+  titleInput.value=''; dueInput.value=''; reminderChk.checked=false;
+});
+clearBtn.addEventListener('click', ()=>{ if(confirm('Clear all tasks?')){ tasks=[]; save(); render(); } });
+exportBtn.addEventListener('click', ()=>{ const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tasks.json'; a.click(); });
+
+// Reminders
+function scheduleReminders(){
+  timers.forEach(t=>clearTimeout(t)); timers = [];
+  if(!('Notification' in window)) return;
+  tasks.forEach(t=>{
+    if(!t.remind || t.done || !t.due) return;
+    const ms = new Date(t.due) - new Date();
+    if(ms <= 0) notifyTask(t);
+    else timers.push(setTimeout(()=> notifyTask(t), Math.min(ms, 2147483647)));
+  });
+}
+function notifyTask(t){
+  if(Notification.permission === 'granted') new Notification('Task Reminder', {body: t.title, icon:''});
+  if(toggleSound.checked) try{ ding.play(); }catch(e){}
+}
+
+/* ---------------- ENHANCED Three.js SCENE ------------------ */
+const canvas = document.getElementById('threeCanvas');
+const threeWrapEl = document.getElementById('threeWrap');
+const width = threeWrapEl.clientWidth;
+const height = threeWrapEl.clientHeight;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, width/height, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({canvas, preserveDrawingBuffer:true, antialias:true});
+renderer.setSize(width, height);
+camera.position.set(0, 2, 6);
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const dirLight = new THREE.DirectionalLight(0x6ee7b7, 0.9);
+dirLight.position.set(5, 5, 5);
+scene.add(dirLight);
+
+const fillLight = new THREE.PointLight(0xff66cc, 0.35);
+fillLight.position.set(-3, 2, -3);
+scene.add(fillLight);
+
+// Ground plane with subtle grid and soft material
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x071022, roughness: 0.9 });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -1.2;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(10, 20, 0x223344, 0x111422);
+grid.position.y = -1.195;
+scene.add(grid);
+
+// Main cube with text faces
+const cubeGeo = new THREE.BoxGeometry(1.6,1.6,1.6);
+const cube = new THREE.Mesh(cubeGeo, Array(6).fill().map(()=> new THREE.MeshStandardMaterial({color:0x0b1220})));
+scene.add(cube);
+
+function createFaceCanvas(text){
+  const c = document.createElement('canvas'); c.width=512; c.height=512;
+  const ctx=c.getContext('2d');
+  // background
+  ctx.fillStyle='#071022'; ctx.fillRect(0,0,512,512);
+  // decorative gradient
+  const g = ctx.createLinearGradient(0,0,512,512);
+  g.addColorStop(0, '#052033'); g.addColorStop(1, '#07263a');
+  ctx.fillStyle = g; ctx.fillRect(12,12,488,488);
+  // text
+  ctx.fillStyle='#9feadf';
+  ctx.font='700 64px Inter, sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text,256,256);
+  // small subtitle
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.font='400 18px Inter, sans-serif';
+  ctx.fillText('3D • Live',256,296);
+  return new THREE.CanvasTexture(c);
+}
+
+['Task','Today','Calendar','Bell','Check','Design'].forEach((f,i)=>{
+  cube.material[i].map = createFaceCanvas(f);
+  cube.material[i].map.needsUpdate = true;
+});
+
+// Floating sphere (reminder bell)
+const sphere = new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 32, 32),
+  new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0x220a00, metalness: 0.2, roughness: 0.45 })
+);
+sphere.position.set(2.2, 0.6, 0.4);
+scene.add(sphere);
+
+// Orbiting torus (calendar ring)
+const ring = new THREE.Mesh(
+  new THREE.TorusGeometry(2.4, 0.06, 16, 120),
+  new THREE.MeshStandardMaterial({ color: 0x6ee7b7, emissive: 0x103322, metalness: 0.1, roughness: 0.6 })
+);
+ring.rotation.x = Math.PI / 3;
+ring.position.set(0, 0.2, 0);
+scene.add(ring);
+
+// Small decorative floating panels
+const panelGeo = new THREE.BoxGeometry(0.8, 0.5, 0.04);
+function makePanel(txt, x,y,z,rotY=0){
+  const tex = createFaceCanvas(txt);
+  const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true });
+  const m = new THREE.Mesh(panelGeo, mat);
+  m.position.set(x,y,z);
+  m.rotation.y = rotY;
+  return m;
+}
+const p1 = makePanel('Notes', -2.2, 0.5, -0.6, 0.5);
+const p2 = makePanel('Stats', -1.0, 0.7, 1.2, -0.3);
+scene.add(p1, p2);
+
+// subtle particle-like points
+const ptsGeo = new THREE.BufferGeometry();
+const ptsCnt = 60;
+const pos = new Float32Array(ptsCnt * 3);
+for(let i=0;i<ptsCnt;i++){
+  pos[i*3 + 0] = (Math.random()-0.5) * 6;
+  pos[i*3 + 1] = Math.random() * 2 - 0.5;
+  pos[i*3 + 2] = (Math.random()-0.5) * 6;
+}
+ptsGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+const ptsMat = new THREE.PointsMaterial({ size: 0.03, color: 0x9feadf, opacity: 0.6, transparent: true });
+const points = new THREE.Points(ptsGeo, ptsMat);
+scene.add(points);
+
+// Animation loop
+let running = true; let last = 0;
+function animate(ts){
+  const t = ts*0.001;
+  const dt = t - last; last = t;
+  if(running){
+    // cube rotation (gentle)
+    cube.rotation.x += 0.35 * dt;
+    cube.rotation.y += 0.45 * dt;
+    cube.position.y = 0.1 * Math.sin(t * 1.2);
+
+    // sphere bounce and pulse
+    sphere.position.y = 0.6 + Math.sin(t * 2.2) * 0.25;
+    sphere.rotation.x += 0.6 * dt;
+
+    // ring slow rotation
+    ring.rotation.z += 0.25 * dt;
+
+    // panels float
+    p1.position.y = 0.5 + Math.sin(t * 1.6) * 0.08;
+    p2.position.y = 0.7 + Math.cos(t * 1.4) * 0.06;
+
+    // particles drift
+    points.rotation.y += 0.02 * dt;
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// Resize handling
+window.addEventListener('resize', ()=>{
+  const w = threeWrapEl.clientWidth, h = threeWrapEl.clientHeight;
+  camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+});
+
+// Click interaction: check cube click
+const ray = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+canvas.addEventListener('pointerdown', (ev)=>{
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  ray.setFromCamera(mouse, camera);
+  const intersects = ray.intersectObjects([cube, sphere, p1, p2], true);
+  if(intersects.length){
+    // if cube or sphere clicked, toggle last incomplete task
+    const lastIncomplete = tasks.find(x=>!x.done);
+    if(lastIncomplete){ toggleDone(lastIncomplete.id); alert('Toggled: '+lastIncomplete.title); }
+    else alert('No incomplete tasks.');
+  }
+});
+
+// Pause/Play & Recorder (reuse UI)
+$('#toggleAnim').addEventListener('click', ()=>{
+  running = !running;
+  $('#toggleAnim').textContent = running ? 'Pause' : 'Play';
+});
+
+// Recording (4 seconds)
+let recorder = null;
+$('#recordBtn').addEventListener('click', ()=>{
+  if(recorder && recorder.state === 'recording') return;
+  const stream = canvas.captureStream(60);
+  const chunks = [];
+  recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = '3d-animation.webm'; a.click();
+  };
+  recorder.start();
+  $('#recordBtn').textContent = 'Recording...';
+  setTimeout(()=>{ recorder.stop(); $('#recordBtn').textContent = 'Record 4s'; }, 4000);
+});
+
+/* ---------------- Calendar ------------------ */
+document.addEventListener('DOMContentLoaded', function() {
+  const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+    initialView: 'dayGridMonth',
+    height: 300,
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+    events: tasks.filter(t=>t.due).map(t=>({ title:t.title, start:t.due, color:t.done?'#9aa4b2':'#6ee7b7' }))
+  });
+  calendar.render();
+  window.refreshCalendar = ()=>{ calendar.removeAllEvents(); calendar.addEventSource(tasks.filter(t=>t.due).map(t=>({ title:t.title, start:t.due, color:t.done?'#9aa4b2':'#6ee7b7' }))); };
+});
+
+/* ---------------- Init ------------------ */
+render(); scheduleReminders();
+</script>
+</body>
+</html>
