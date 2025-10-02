@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Star Survival Game</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html,body{
+    margin:0;
+    padding:0;
+    height:100%;
+    width:100%;
+    background:#000;
+    overflow:hidden;
+  }
+  canvas{
+    display:block;
+    width:100%;
+    height:100%;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const DPR = window.devicePixelRatio || 1;
+
+// === SOUNDS ===
+let jumpSound = new Audio("jump.wav");
+let hitSound = new Audio("hit.wav");
+let gameOverSound = new Audio("gameover.wav");
+
+// 🎶 Geometry Dash–style background music
+let bgm = new Audio("geometrydash.mp3"); // <-- replace with your music file
+bgm.loop = true;
+bgm.volume = 0.7;  // adjust volume
+
+function playSound(s){
+  s.currentTime = 0;
+  s.play();
+}
+
+function resizeCanvas(){
+  canvas.width = window.innerWidth * DPR;
+  canvas.height = window.innerHeight * DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  hero.baseY = window.innerHeight - hero.h; 
+}
+window.addEventListener("resize",resizeCanvas);
+
+let playing=false,lastTime=0,score=0,speed=8,obstacles=[];
+let gravity=0.9,hue=200;
+
+// === Load Star Sprite ===
+let charImg = new Image();
+charImg.src = "star.png"; // <-- replace with your star sprite
+let charLoaded = false;
+charImg.onload = () => charLoaded = true;
+
+// === Walk Animation ===
+let walkFrameIndex = 0; 
+let walkFrameCount = 4;   // number of frames
+let walkFrameWidth = 25;  
+let walkFrameHeight = 35; 
+let walkTimer = 0; 
+let walkSpeed = 100;       
+
+// === Hero (Star) ===
+let hero = {
+  x: 120, y: 0,
+  w: walkFrameWidth*2, h: walkFrameHeight*2,
+  vy: 0, vx: 0,
+  speed: 6, baseY: window.innerHeight - walkFrameHeight*2,
+  jumping: false, moving: false, facing: 1,
+  health: 3, hitFlash: 0,
+
+  draw(color) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(this.facing, 1);
+
+    if(this.hitFlash > 0){
+      ctx.globalAlpha = this.hitFlash % 0.2 < 0.1 ? 0.3 : 1;
+      this.hitFlash -= 0.05;
+    }
+
+    if (charLoaded) {
+      if (walkFrameCount > 1) {
+        if (this.jumping) {
+          ctx.drawImage(charImg, (walkFrameCount-1)*walkFrameWidth, 0, walkFrameWidth, walkFrameHeight,
+            0,0,this.w*this.facing,this.h);
+        } else {
+          if (this.moving) {
+            walkTimer += 16;
+            if (walkTimer > walkSpeed) {
+              walkFrameIndex = (walkFrameIndex+1) % (walkFrameCount-1);
+              walkTimer = 0;
+            }
+          } else { walkFrameIndex = 0; }
+          ctx.drawImage(charImg, walkFrameIndex*walkFrameWidth,0,walkFrameWidth,walkFrameHeight,
+            0,0,this.w*this.facing,this.h);
+        }
+      } else {
+        ctx.drawImage(charImg, 0,0,charImg.width,charImg.height,
+          0,0,this.w*this.facing,this.h);
+      }
+    } else {
+      ctx.fillStyle=color;
+      ctx.beginPath();
+      ctx.arc(this.w/2, this.h/2, this.w/2, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  },
+
+  update() {
+    this.vy += gravity;
+    this.y += this.vy;
+    if (this.y > this.baseY - this.h) {
+      this.y = this.baseY - this.h;
+      this.vy = 0;
+      this.jumping = false;
+    } 
+    this.x += this.vx;
+    if (this.x < 0) this.x = 0;
+    if (this.x + this.w > window.innerWidth) this.x = window.innerWidth - this.w;
+  },
+
+  moveLeft(){ this.vx=-this.speed; this.moving=true; this.facing=-1; },
+  moveRight(){ this.vx=this.speed; this.moving=true; this.facing=1; },
+  stop(){ this.vx=0; this.moving=false; },
+
+  jump(){
+    if(this.jumping) return;
+    this.vy = -18;
+    this.jumping = true;
+    playSound(jumpSound);
+  },
+
+  bounds(){ return {x:this.x,y:this.y,w:this.w,h:this.h}; }
+};
+
+// === Obstacles ===
+function makeSpike(){
+  return {
+    x:window.innerWidth+20,
+    y:hero.baseY,
+    w:40, h:50, hit:false, pulse:0,
+    draw(color){
+      ctx.save();
+      ctx.shadowBlur=20;
+      ctx.shadowColor=color;
+      ctx.fillStyle=color;
+      this.pulse += 0.15;
+      let scale = 1 + Math.sin(this.pulse) * 0.2;
+      ctx.beginPath();
+      ctx.moveTo(this.x,this.y);
+      ctx.lineTo(this.x+this.w/2,this.y-this.h*scale);
+      ctx.lineTo(this.x+this.w,this.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    },
+    update(dt){ this.x -= speed*(dt/16); },
+    off(){ return this.x+this.w<-20; },
+    bounds(){ return {x:this.x,y:this.y-this.h,w:this.w,h:this.h}; }
+  };
+}
+
+// === Collision ===
+function collide(a,b){
+  return !(a.x+a.w<b.x||a.x>b.x+b.w||a.y+a.h<b.y||a.y>b.y+b.h);
+}
+
+function loop(now){
+  if(!playing) return;
+  let dt=now-lastTime; lastTime=now;
+  score+=Math.floor(dt/16);
+  hue=(hue+0.7)%360; 
+  if(score % 300 === 0) speed += 0.2;
+  if(Math.random()<0.02){obstacles.push(makeSpike());}
+  hero.update();
+  obstacles.forEach(o=>o.update(dt));
+  obstacles=obstacles.filter(o=>!o.off());
+  for(let o of obstacles){ 
+    if(collide(hero.bounds(),o.bounds()) && !o.hit){
+      o.hit=true;
+      hero.health--;
+      hero.hitFlash=1; 
+      playSound(hitSound);
+      if(hero.health<=0){ 
+        playing=false; 
+        bgm.pause();  // stop bgm
+        playSound(gameOverSound);
+      }
+    } 
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+// === Render ===
+function render(){
+  let w=window.innerWidth,h=window.innerHeight;
+  ctx.clearRect(0,0,w,h);
+  let color=`hsl(${hue},100%,60%)`;
+
+  let grad=ctx.createLinearGradient(0,0,w,h);
+  grad.addColorStop(0,`hsl(${(hue+40)%360},80%,15%)`);
+  grad.addColorStop(1,`hsl(${(hue+200)%360},80%,5%)`);
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,w,h);
+
+  for(let i=0;i<50;i++){
+    ctx.fillStyle=`hsla(${(hue+i*5)%360},100%,80%,${Math.random()*0.8})`;
+    ctx.fillRect(Math.random()*w,Math.random()*h,2,2);
+  }
+
+  hero.draw(color);
+  obstacles.forEach(o=>o.draw(color));
+
+  ctx.fillStyle=color;
+  ctx.font="bold 28px monospace";
+  ctx.shadowBlur=12;
+  ctx.shadowColor=color;
+  ctx.textAlign="center";
+  ctx.fillText("SCORE: "+score, w/2, 40);
+
+  ctx.font="26px monospace";
+  ctx.textAlign="right";
+  ctx.fillText("HEALTH: " + "❤️".repeat(hero.health), w-20, 40);
+  ctx.shadowBlur=0;
+
+  if(!playing){
+    ctx.fillStyle="rgba(0,0,0,0.7)";
+    ctx.fillRect(0,0,w,h);
+    ctx.fillStyle=color;
+    ctx.font="bold 40px monospace";
+    ctx.textAlign="center";
+    ctx.fillText("GAME OVER",w/2,h/2-40);
+    ctx.font="22px monospace";
+    ctx.fillText("Final Score: "+score,w/2,h/2);
+    ctx.fillText("Click / Space to Restart",w/2,h/2+40);
+  }
+}
+
+// === Reset ===
+function resetGame(){
+  obstacles=[];
+  score=0;
+  speed=8;
+  hero.y=hero.baseY-hero.h;
+  hero.vy=0;
+  hero.jumping=false;
+  hero.health=3;
+  hero.hitFlash=0;
+  playing=true;
+  lastTime=performance.now();
+
+  bgm.currentTime=0;
+  bgm.play();  // play bgm when reset
+  requestAnimationFrame(loop);
+}
+
+// === Controls ===
+window.addEventListener("keydown",e=>{
+  if(e.code==="Space"||e.code==="ArrowUp"){ if(!playing){resetGame();} else{hero.jump();} }
+  if(e.code==="ArrowLeft"||e.code==="KeyA"){ hero.moveLeft(); }
+  if(e.code==="ArrowRight"||e.code==="KeyD"){ hero.moveRight(); }
+});
+window.addEventListener("keyup",e=>{
+  if(e.code==="ArrowLeft"||e.code==="KeyA"||e.code==="ArrowRight"||e.code==="KeyD"){ hero.stop(); }
+});
+canvas.addEventListener("mousedown",()=>{ if(!playing){resetGame();} else{hero.jump();} });
+
+resizeCanvas();
+render();
+</script>
+</body>
+</html>
